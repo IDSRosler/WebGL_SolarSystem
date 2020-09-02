@@ -204,9 +204,6 @@ function setCameras() {
     gl.canvas.clientWidth / gl.canvas.clientHeight, // aspect
     60  // fieldOfView
   );
-
-  console.log(cameras[0])
-  console.log(cameras[1])
 }
 
 function setSphere() {
@@ -241,17 +238,17 @@ function setSolarSystemNodes() {
 }
 
 function configSolarSystem() {
-  mercuryOrbitNode.localMatrix = m4.translation(100, 0, 0); // earth orbit 100 units from the sun
-  venusOrbitNode.localMatrix = m4.translation(200, 0, 0);   // earth orbit 200 units from the sun
-  earthOrbitNode.localMatrix = m4.translation(300, 0, 0);   // earth orbit 300 units from the sun
+  mercuryOrbitNode.localMatrix = m4.translation(150, 0, 0); // earth orbit 100 units from the sun
+  venusOrbitNode.localMatrix = m4.translation(250, 0, 0);   // earth orbit 200 units from the sun
+  earthOrbitNode.localMatrix = m4.translation(350, 0, 0);   // earth orbit 300 units from the sun
   moonOrbitNode.localMatrix = m4.translation(30, 0, 0);     // moon 30 units from the earth
-  marsOrbitNode.localMatrix = m4.translation(400, 0, 0);    // earth orbit 400 units from the sun
-  jupterOrbitNode.localMatrix = m4.translation(500, 0, 0);    // earth orbit 500 units from the sun
-  saturnOrbitNode.localMatrix = m4.translation(600, 0, 0);    // earth orbit 600 units from the sun
-  uranusOrbitNode.localMatrix = m4.translation(700, 0, 0);    // earth orbit 700 units from the sun
-  neptuneOrbitNode.localMatrix = m4.translation(800, 0, 0);    // earth orbit 800 units from the sun
+  marsOrbitNode.localMatrix = m4.translation(450, 0, 0);    // earth orbit 400 units from the sun
+  jupterOrbitNode.localMatrix = m4.translation(550, 0, 0);    // earth orbit 500 units from the sun
+  saturnOrbitNode.localMatrix = m4.translation(650, 0, 0);    // earth orbit 600 units from the sun
+  uranusOrbitNode.localMatrix = m4.translation(750, 0, 0);    // earth orbit 700 units from the sun
+  neptuneOrbitNode.localMatrix = m4.translation(850, 0, 0);    // earth orbit 800 units from the sun
 
-  sunNode.localMatrix = m4.scaling(7, 7, 7);  // sun a the center
+  sunNode.localMatrix = m4.scaling(7, 7, 7);  // sun
   sunNode.drawInfo = {
     uniforms: {
       u_colorOffset: [0.6, 0.6, 0, 1], // yellow
