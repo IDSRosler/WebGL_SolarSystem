@@ -7,33 +7,61 @@
 var vs = `#version 300 es
 
 in vec4 a_position;
-in vec4 a_color;
+in vec3 a_normal;
 
-uniform mat4 u_matrix;
+uniform vec3 u_lightWorldPosition; //position of ligth
 
-out vec4 v_color;
+uniform mat4 u_world;
+uniform mat4 u_worldViewProjection;
+uniform mat4 u_worldInverseTranspose;
+
+out vec3 v_normal;
+out vec3 v_surfaceToLight;
 
 void main() {
   // Multiply the position by the matrix.
-  gl_Position = u_matrix * a_position;
+  gl_Position = u_worldViewProjection * a_position;
 
-  // Pass the color to the fragment shader.
-  v_color = a_color;
+  // orient the normals and pass to the fragment shader
+  v_normal = mat3(u_worldInverseTranspose) * a_normal;
+
+  // compute the world position of the surface
+  vec3 surfaceWorldPosition = (u_world * a_position).xyz;
+ 
+  // compute the vector of the surface to the light
+  // and pass it to the fragment shader
+  v_surfaceToLight = u_lightWorldPosition - surfaceWorldPosition;
 }
 `;
 var fs = `#version 300 es
 precision highp float;
 
 // Passed in from the vertex shader.
-in vec4 v_color;
+in vec3 v_normal;
+in vec3 v_surfaceToLight;
 
-uniform vec4 u_colorMult;
-uniform vec4 u_colorOffset;
+uniform vec4 u_color;
+uniform vec3 u_lightDirection;
+uniform float u_limit;
 
 out vec4 outColor;
 
 void main() {
-   outColor = v_color * u_colorMult + u_colorOffset;
+  vec3 normal = normalize(v_normal);
+
+  vec3 surfaceToLightDirection = normalize(v_surfaceToLight);
+
+  float light = 0.0;
+  float dotFromDirection = dot(surfaceToLightDirection,-u_lightDirection);
+
+  if (dotFromDirection >= u_limit) {
+    light = dot(normal, surfaceToLightDirection);
+  }
+  //float light = dot(v_normal, surfaceToLightDirection);
+  
+
+  outColor = u_color;
+  outColor.rgb *= light;
 }
 `;
 
@@ -106,6 +134,12 @@ Camera.prototype.setMatrix = function() {
 };
 
 /*************************************************************************************************************************
+ Class Lights
+ *************************************************************************************************************************/
+
+var Light = function() {};
+
+/*************************************************************************************************************************
  Global Variables
  *************************************************************************************************************************/
 
@@ -118,6 +152,8 @@ var objects = [];
 
 var cameras = [];
 var cameraIndex = 1;
+
+var lights = [];
 
 /*************************************************************************************************************************
  Buffers
@@ -207,8 +243,8 @@ function setCameras() {
 }
 
 function setSphere() {
- sphereBufferInfo = flattenedPrimitives.createSphereBufferInfo(gl, 10, 50, 20);
- sphereVAO = twgl.createVAOFromBufferInfo(gl, programInfo, sphereBufferInfo);
+  sphereBufferInfo = flattenedPrimitives.createSphereBufferInfo(gl, 10, 50, 20);
+  sphereVAO = twgl.createVAOFromBufferInfo(gl, programInfo, sphereBufferInfo);
 }
 
 function setSolarSystemNodes() {
@@ -251,8 +287,7 @@ function configSolarSystem() {
   sunNode.localMatrix = m4.scaling(7, 7, 7);  // sun
   sunNode.drawInfo = {
     uniforms: {
-      u_colorOffset: [0.6, 0.6, 0, 1], // yellow
-      u_colorMult:   [0.4, 0.4, 0, 1],
+      u_color: [1, 1, 0, 1], // yellow
     },
     programInfo: programInfo,
     bufferInfo: sphereBufferInfo,
@@ -262,8 +297,7 @@ function configSolarSystem() {
   mercuryNode.localMatrix = m4.scaling(0.8, 0.8, 0.8); // mercury
   mercuryNode.drawInfo = {
     uniforms: {
-      u_colorOffset: [0.8, 0.4, 0.4, 1],  // red
-      u_colorMult:   [0.8, 0.5, 0.2, 1],
+      u_color: [0.8, 0.4, 0.4, 1],  // red
     },
     programInfo: programInfo,
     bufferInfo: sphereBufferInfo,
@@ -273,8 +307,7 @@ function configSolarSystem() {
   venusNode.localMatrix = m4.scaling(1.25, 1.25, 1.25); // venus
   venusNode.drawInfo = {
     uniforms: {
-      u_colorOffset: [0.8, 0.5, 0.2, 1],  // blue-green
-      u_colorMult:   [0.8, 0.5, 0.2, 1],
+      u_color: [0.8, 0.5, 0.2, 1],  // blue-green
     },
     programInfo: programInfo,
     bufferInfo: sphereBufferInfo,
@@ -284,8 +317,7 @@ function configSolarSystem() {
   earthNode.localMatrix = m4.scaling(1.3, 1.3, 1.3); // earth
   earthNode.drawInfo = {
     uniforms: {
-      u_colorOffset: [0.2, 0.5, 0.8, 1],  // blue-green
-      u_colorMult:   [0.8, 0.5, 0.2, 1],
+      u_color: [0.2, 0.5, 0.8, 1],  // blue-green
     },
     programInfo: programInfo,
     bufferInfo: sphereBufferInfo,
@@ -295,8 +327,7 @@ function configSolarSystem() {
   moonNode.localMatrix = m4.scaling(0.3, 0.3, 0.3); // moon
   moonNode.drawInfo = {
     uniforms: {
-      u_colorOffset: [0.6, 0.6, 0.6, 1],  // gray
-      u_colorMult:   [0.1, 0.1, 0.1, 1],
+      u_color: [0.6, 0.6, 0.6, 1],  // gray
     },
     programInfo: programInfo,
     bufferInfo: sphereBufferInfo,
@@ -306,8 +337,7 @@ function configSolarSystem() {
   marsNode.localMatrix = m4.scaling(1, 1, 1); // mars
   marsNode.drawInfo = {
     uniforms: {
-      u_colorOffset: [0.8, 0.3, 0.3, 1],  // red
-      u_colorMult:   [0.8, 0.3, 0.3, 1],
+      u_color: [0.8, 0.3, 0.3, 1],  // red
     },
     programInfo: programInfo,
     bufferInfo: sphereBufferInfo,
@@ -317,8 +347,7 @@ function configSolarSystem() {
   jupterNode.localMatrix = m4.scaling(2.5, 2.5, 2.5); // jupter
   jupterNode.drawInfo = {
     uniforms: {
-      u_colorOffset: [0.8, 0.3, 0.8, 1],  // purple
-      u_colorMult:   [0.8, 0.3, 0.8, 1],
+      u_color: [0.8, 0.3, 0.8, 1],  // purple
     },
     programInfo: programInfo,
     bufferInfo: sphereBufferInfo,
@@ -328,8 +357,7 @@ function configSolarSystem() {
   saturnNode.localMatrix = m4.scaling(2.1, 2.1, 2.1); // saturn
   saturnNode.drawInfo = {
     uniforms: {
-      u_colorOffset: [0.8, 0.8, 0.5, 1],  // brown
-      u_colorMult:   [0.5, 0.5, 0.4, 1],
+      u_color: [0.8, 0.8, 0.5, 1],  // brown
     },
     programInfo: programInfo,
     bufferInfo: sphereBufferInfo,
@@ -339,8 +367,7 @@ function configSolarSystem() {
   uranusNode.localMatrix = m4.scaling(1.5, 1.5, 1.5); // uranus
   uranusNode.drawInfo = {
     uniforms: {
-      u_colorOffset: [0.1, 0.8, 0.5, 1],  // blue-green
-      u_colorMult:   [0.1, 0.8, 0.8, 1],
+      u_color: [0.1, 0.8, 0.5, 1],  // blue-green
     },
     programInfo: programInfo,
     bufferInfo: sphereBufferInfo,
@@ -350,8 +377,7 @@ function configSolarSystem() {
   neptuneNode.localMatrix = m4.scaling(1.2, 1.2, 1.2); // neptune
   neptuneNode.drawInfo = {
     uniforms: {
-      u_colorOffset: [0.1, 0.1, 0.8, 1],  // blue
-      u_colorMult:   [0.1, 0.1, 0.8, 1],
+      u_color: [0.1, 0.1, 0.8, 1],  // blue
     },
     programInfo: programInfo,
     bufferInfo: sphereBufferInfo,
@@ -435,6 +461,25 @@ function setRotationMoviment() {
   m4.multiply(m4.yRotation(0.09), neptuneNode.localMatrix, neptuneNode.localMatrix);
 }
 
+function setLights() {
+  var pointLight = new Light();
+
+  pointLight.drawInfo = {
+    uniforms: {
+      u_lightWorldPosition: [0,0,0],
+      u_lightDirection: [0,0,0],
+      u_limit: Math.cos(degToRad(180)),
+    },
+    programInfo: programInfo,
+    bufferInfo: sphereBufferInfo,
+    vertexArray: sphereVAO,
+  }
+
+  lights = [
+    pointLight.drawInfo,
+  ]
+}
+
 function drawScene(time) {
   time *= 0.001;
 
@@ -447,13 +492,20 @@ function drawScene(time) {
 
   solarSystemNode.updateWorldMatrix(); // Update all world matrices in the scene graph
 
+  setLights();
+
   // Compute all the matrices for rendering
   objects.forEach(function(object) {
-      object.drawInfo.uniforms.u_matrix = m4.multiply(cameras[cameraIndex].viewProjectionMatrix, object.worldMatrix);
+    object.drawInfo.uniforms.u_worldViewProjection = m4.multiply(cameras[cameraIndex].viewProjectionMatrix, object.worldMatrix);
+    var worldInverseMatrix = m4.inverse(object.worldMatrix);
+    var worldInverseTransposeMatrix = m4.transpose(worldInverseMatrix);
+    object.drawInfo.uniforms.u_world = object.worldMatrix;
+    object.drawInfo.uniforms.u_worldInverseTranspose = worldInverseTransposeMatrix;
   });
 
   // ------ Draw the objects --------
 
+  twgl.drawObjectList(gl, lights);
   twgl.drawObjectList(gl, objectsToDraw);
   requestAnimationFrame(drawScene);
 }
