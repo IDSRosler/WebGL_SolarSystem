@@ -165,8 +165,6 @@ var objects = [];
 var cameras = [];
 var cameraIndex = 1;
 
-var lights = [];
-
 /* var lightWorldPositionLocation;
 var lightDirection;
 var limit; */
@@ -215,9 +213,9 @@ function main() {
   initProgram();
   setSphere();
 
-  setCameras();
+  setStaticCameras();
 
-  setSolarSystemNodes();
+  setSolarSystemNodes();  
   configSolarSystem();  
 
   requestAnimationFrame(drawScene);
@@ -237,7 +235,8 @@ function initProgram() {
   programInfo = twgl.createProgramInfo(gl, [vs, fs]);  // setup GLSL program
 }
 
-function setCameras() {
+function setStaticCameras() {
+  cameras.push(new Camera);
   cameras.push(new Camera);
   cameras.push(new Camera);
 
@@ -258,9 +257,24 @@ function setCameras() {
   );
 }
 
+function setEarthCamera() {
+  var cameraPosition = [earthOrbitNode.localMatrix[12]-50, earthOrbitNode.localMatrix[13], earthOrbitNode.localMatrix[14]];
+  var cameraTarget = [earthOrbitNode.localMatrix[12], earthOrbitNode.localMatrix[13], earthOrbitNode.localMatrix[14]];
+
+  cameras[2].setAttributes( // Camera 0
+    cameraPosition, // position
+    cameraTarget,   // target
+    [0,1,0],   // up
+    gl.canvas.clientWidth / gl.canvas.clientHeight, // aspect
+    60  // fieldOfView
+  );
+}
+
 function setSphere() {
   sphereBufferInfo = flattenedPrimitives.createSphereBufferInfo(gl, 10, 50, 20);
   sphereVAO = twgl.createVAOFromBufferInfo(gl, programInfo, sphereBufferInfo);
+
+  console.log(sphereBufferInfo);
 }
 
 function setSolarSystemNodes() {
@@ -290,15 +304,15 @@ function setSolarSystemNodes() {
 }
 
 function configSolarSystem() {
-  mercuryOrbitNode.localMatrix = m4.translation(150, 0, 0); // earth orbit 100 units from the sun
-  venusOrbitNode.localMatrix = m4.translation(250, 0, 0);   // earth orbit 200 units from the sun
-  earthOrbitNode.localMatrix = m4.translation(350, 0, 0);   // earth orbit 300 units from the sun
+  mercuryOrbitNode.localMatrix = m4.translation(150, 0, 0); // earth orbit 150 units from the sun
+  venusOrbitNode.localMatrix = m4.translation(250, 0, 0);   // earth orbit 250 units from the sun
+  earthOrbitNode.localMatrix = m4.translation(350, 0, 0);   // earth orbit 350 units from the sun
   moonOrbitNode.localMatrix = m4.translation(30, 0, 0);     // moon 30 units from the earth
-  marsOrbitNode.localMatrix = m4.translation(450, 0, 0);    // earth orbit 400 units from the sun
-  jupterOrbitNode.localMatrix = m4.translation(550, 0, 0);    // earth orbit 500 units from the sun
-  saturnOrbitNode.localMatrix = m4.translation(650, 0, 0);    // earth orbit 600 units from the sun
-  uranusOrbitNode.localMatrix = m4.translation(750, 0, 0);    // earth orbit 700 units from the sun
-  neptuneOrbitNode.localMatrix = m4.translation(850, 0, 0);    // earth orbit 800 units from the sun
+  marsOrbitNode.localMatrix = m4.translation(450, 0, 0);    // earth orbit 450 units from the sun
+  jupterOrbitNode.localMatrix = m4.translation(550, 0, 0);    // earth orbit 550 units from the sun
+  saturnOrbitNode.localMatrix = m4.translation(650, 0, 0);    // earth orbit 650 units from the sun
+  uranusOrbitNode.localMatrix = m4.translation(750, 0, 0);    // earth orbit 750 units from the sun
+  neptuneOrbitNode.localMatrix = m4.translation(850, 0, 0);    // earth orbit 850 units from the sun
 
   sunNode.localMatrix = m4.scaling(7, 7, 7);  // sun
   sunNode.drawInfo = {
@@ -559,12 +573,14 @@ function drawScene(time) {
 
   configScene();
 
-  cameras[cameraIndex].setMatrix();
-
   setTranslationMoviment();
   setRotationMoviment();  
 
   solarSystemNode.updateWorldMatrix(); // Update all world matrices in the scene graph
+
+  setEarthCamera();
+
+  cameras[cameraIndex].setMatrix();
 
   setLights();
 
