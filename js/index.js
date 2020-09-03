@@ -9,14 +9,14 @@ var vs = `#version 300 es
 in vec4 a_position;
 in vec3 a_normal;
 
-uniform vec3 u_lightWorldPosition; //position of ligth
+uniform vec3 u_lightWorldPosition[7]; //position of ligth
 
 uniform mat4 u_world;
 uniform mat4 u_worldViewProjection;
 uniform mat4 u_worldInverseTranspose;
 
 out vec3 v_normal;
-out vec3 v_surfaceToLight;
+out vec3 v_surfaceToLight[7];
 
 void main() {
   // Multiply the position by the matrix.
@@ -30,7 +30,10 @@ void main() {
  
   // compute the vector of the surface to the light
   // and pass it to the fragment shader
-  v_surfaceToLight = u_lightWorldPosition - surfaceWorldPosition;
+  for(int i = 0; i<7; i++){
+    v_surfaceToLight[i] = u_lightWorldPosition[i] - surfaceWorldPosition;
+  }
+  //v_surfaceToLight = u_lightWorldPosition - surfaceWorldPosition;
 }
 `;
 var fs = `#version 300 es
@@ -38,30 +41,39 @@ precision highp float;
 
 // Passed in from the vertex shader.
 in vec3 v_normal;
-in vec3 v_surfaceToLight;
+in vec3 v_surfaceToLight[7];
 
 uniform vec4 u_color;
-uniform vec3 u_lightDirection;
-uniform float u_limit;
+uniform vec3 u_lightDirection[7];
+uniform float u_limit[7];
 
 out vec4 outColor;
 
 void main() {
   vec3 normal = normalize(v_normal);
 
-  vec3 surfaceToLightDirection = normalize(v_surfaceToLight);
+  vec3 surfaceToLightDirection[7];
+  //vec3 surfaceToLightDirection = normalize(v_surfaceToLight);
+
+  for(int i = 0; i<7; i++){
+    surfaceToLightDirection[i] = normalize(v_surfaceToLight[i]);
+  }
 
   float light = 0.0;
-  float dotFromDirection = dot(surfaceToLightDirection,-u_lightDirection);
+  float dotFromDirection;
+  float brightness = 0.8;
+  float ambience = 0.01;
+  float diffuse = 0.2;  
 
-  if (dotFromDirection >= u_limit) {
-    light = dot(normal, surfaceToLightDirection);
+  for(int i = 0; i<7; i++){
+    dotFromDirection = dot(surfaceToLightDirection[i],-u_lightDirection[i]);
+    if (dotFromDirection >= u_limit[i]) {
+      light = max(0.0,dot(normal, surfaceToLightDirection[i]));
+    }
+    outColor.rgb += diffuse * brightness * light * u_color.rgb;
   }
-  //float light = dot(v_normal, surfaceToLightDirection);
-  
-
-  outColor = u_color;
-  outColor.rgb *= light;
+  outColor.rgb += ambience * 1.0 * u_color.rgb;
+  outColor.a = 1.0;
 }
 `;
 
@@ -154,6 +166,10 @@ var cameras = [];
 var cameraIndex = 1;
 
 var lights = [];
+
+/* var lightWorldPositionLocation;
+var lightDirection;
+var limit; */
 
 /*************************************************************************************************************************
  Buffers
@@ -287,7 +303,7 @@ function configSolarSystem() {
   sunNode.localMatrix = m4.scaling(7, 7, 7);  // sun
   sunNode.drawInfo = {
     uniforms: {
-      u_color: [1, 1, 0, 1], // yellow
+      u_color: [6, 5, 0, 1], // yellow
     },
     programInfo: programInfo,
     bufferInfo: sphereBufferInfo,
@@ -463,21 +479,79 @@ function setRotationMoviment() {
 
 function setLights() {
   var pointLight = new Light();
+  var sunLightRigth = new Light();
+  var sunLightLeft = new Light();
+  var sunLightUp = new Light();
+  var sunLightDown = new Light();
+  var sunLightFront = new Light();
+  var sunLightBack = new Light();
 
-  pointLight.drawInfo = {
-    uniforms: {
-      u_lightWorldPosition: [0,0,0],
-      u_lightDirection: [0,0,0],
-      u_limit: Math.cos(degToRad(180)),
-    },
-    programInfo: programInfo,
-    bufferInfo: sphereBufferInfo,
-    vertexArray: sphereVAO,
+  pointLight = {
+    lightWorldPosition: [0,0,0],
+    lightDirection: [0,0,0],
+    limit: Math.cos(degToRad(180)),
+  }
+  sunLightRigth = {
+    lightWorldPosition: [150,0,0],
+    lightDirection: [-10,0,0],
+    limit: Math.cos(degToRad(90)),
+  }
+  sunLightLeft = {
+    lightWorldPosition: [-150,0,0],
+    lightDirection: [10,0,0],
+    limit: Math.cos(degToRad(90)),
+  }
+  sunLightUp = {
+    lightWorldPosition: [0,150,0],
+    lightDirection: [0,-10,0],
+    limit: Math.cos(degToRad(90)),
+  }
+  sunLightDown = {
+    lightWorldPosition: [0,-150,0],
+    lightDirection: [0,10,0],
+    limit: Math.cos(degToRad(90)),
+  }
+  sunLightFront = {
+    lightWorldPosition: [0,0,-150],
+    lightDirection: [0,0,10],
+    limit: Math.cos(degToRad(90)),
+  }
+  sunLightBack = {
+    lightWorldPosition: [0,0,150],
+    lightDirection: [0,0,-10],
+    limit: Math.cos(degToRad(90)),
   }
 
-  lights = [
-    pointLight.drawInfo,
-  ]
+
+  const uniforms = {
+    u_lightWorldPosition: pointLight.lightWorldPosition.concat(
+      sunLightRigth.lightWorldPosition, 
+      sunLightLeft.lightWorldPosition,
+      sunLightUp.lightWorldPosition,
+      sunLightDown.lightWorldPosition,
+      sunLightFront.lightWorldPosition,
+      sunLightBack.lightWorldPosition
+    ),
+    u_lightDirection: pointLight.lightDirection.concat(
+      sunLightRigth.lightDirection, 
+      sunLightLeft.lightDirection,
+      sunLightUp.lightDirection,
+      sunLightDown.lightDirection,
+      sunLightFront.lightDirection,
+      sunLightBack.lightDirection
+    ),
+    u_limit: [
+      pointLight.limit, 
+      sunLightRigth.limit, 
+      sunLightLeft.limit,
+      sunLightUp.limit,
+      sunLightDown.limit,
+      sunLightFront.limit,
+      sunLightBack.limit
+    ]
+  }
+
+  twgl.setUniforms(programInfo, uniforms);
 }
 
 function drawScene(time) {
@@ -505,7 +579,7 @@ function drawScene(time) {
 
   // ------ Draw the objects --------
 
-  twgl.drawObjectList(gl, lights);
+  //twgl.drawObjectList(gl, lights);
   twgl.drawObjectList(gl, objectsToDraw);
   requestAnimationFrame(drawScene);
 }
