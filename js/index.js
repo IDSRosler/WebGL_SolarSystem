@@ -8,6 +8,7 @@ var vs = `#version 300 es
 
 in vec4 a_position;
 in vec3 a_normal;
+in vec2 a_texcoord;
 
 uniform vec3 u_lightWorldPosition[7]; //position of ligth
 
@@ -15,65 +16,61 @@ uniform mat4 u_world;
 uniform mat4 u_worldViewProjection;
 uniform mat4 u_worldInverseTranspose;
 
-out vec3 v_normal;
 out vec3 v_surfaceToLight[7];
+out vec3 v_normal;
+out vec2 v_texCoord;
 
 void main() {
-  // Multiply the position by the matrix.
-  gl_Position = u_worldViewProjection * a_position;
-
-  // orient the normals and pass to the fragment shader
-  v_normal = mat3(u_worldInverseTranspose) * a_normal;
-
-  // compute the world position of the surface
-  vec3 surfaceWorldPosition = (u_world * a_position).xyz;
+  v_texCoord = a_texcoord;
+  gl_Position = u_worldViewProjection * a_position;       // Multiply the position by the matrix.
+  v_normal = mat3(u_worldInverseTranspose) * a_normal;    // orient the normals and pass to the fragment shader
+  vec3 surfaceWorldPosition = (u_world * a_position).xyz; // compute the world position of the surface
  
   // compute the vector of the surface to the light
-  // and pass it to the fragment shader
   for(int i = 0; i<7; i++){
     v_surfaceToLight[i] = u_lightWorldPosition[i] - surfaceWorldPosition;
   }
-  //v_surfaceToLight = u_lightWorldPosition - surfaceWorldPosition;
 }
 `;
 var fs = `#version 300 es
 precision highp float;
 
-// Passed in from the vertex shader.
+in vec2 v_texCoord;
 in vec3 v_normal;
 in vec3 v_surfaceToLight[7];
 
-uniform vec4 u_color;
 uniform vec3 u_lightDirection[7];
+uniform vec3 u_lightColor;
+uniform vec4 u_colorMult;
+uniform sampler2D u_diffuse;
 uniform float u_limit[7];
 
 out vec4 outColor;
 
 void main() {
+  vec4 diffuseColor = texture(u_diffuse, v_texCoord);
   vec3 normal = normalize(v_normal);
 
   vec3 surfaceToLightDirection[7];
-  //vec3 surfaceToLightDirection = normalize(v_surfaceToLight);
 
   for(int i = 0; i<7; i++){
     surfaceToLightDirection[i] = normalize(v_surfaceToLight[i]);
   }
 
-  float light = 0.0;
+  float light;
   float dotFromDirection;
-  float brightness = 0.8;
-  float ambience = 0.01;
-  float diffuse = 0.2;  
+  float brightness = 0.05;
+  float ambient = 0.01;
 
   for(int i = 0; i<7; i++){
     dotFromDirection = dot(surfaceToLightDirection[i],-u_lightDirection[i]);
     if (dotFromDirection >= u_limit[i]) {
       light = max(0.0,dot(normal, surfaceToLightDirection[i]));
     }
-    outColor.rgb += diffuse * brightness * light * u_color.rgb;
+    outColor.rgb += u_lightColor * diffuseColor.rgb * brightness * light * u_colorMult.rgb;
   }
-  outColor.rgb += ambience * 1.0 * u_color.rgb;
-  outColor.a = 1.0;
+  outColor.rgb += ambient;
+  outColor.a = diffuseColor.a;
 }
 `;
 
@@ -155,15 +152,22 @@ var Light = function() {};
  Global Variables
  *************************************************************************************************************************/
 
-var programInfo;
+ // setup GLSL program
+var program;
+var uniformSetters;
+var attribSetters;
+var attribs;
 var canvas;
 var gl;
+var then = 0;
 
 var objectsToDraw = [];
 var objects = [];
 
 var cameras = [];
 var cameraIndex = 1;
+
+var textures;
 
 /* var lightWorldPositionLocation;
 var lightDirection;
@@ -173,7 +177,7 @@ var limit; */
  Buffers
  *************************************************************************************************************************/
 
-var sphereBufferInfo;
+var sphereBuffer;
 var sphereVAO;
 
 /*************************************************************************************************************************
@@ -205,13 +209,31 @@ var uranusNode;
 var neptuneNode;
 
 /*************************************************************************************************************************
+ Textures
+ *************************************************************************************************************************/
+
+var sunTexture;
+var mercuryTexture;
+var venusTexture;
+var earthTexture;
+var moonTexture;
+var marsTexture;
+var jupterTexture;
+var saturnTexture;
+var uranusTexture;
+var neptuneTexture;
+var starTexture;
+
+/*************************************************************************************************************************
  Main
  *************************************************************************************************************************/
 
 function main() {
 
   initProgram();
+
   setSphere();
+  setTextures();
 
   setStaticCameras();
 
@@ -231,8 +253,44 @@ function initProgram() {
   if (!gl) {
     return;
   }
-  twgl.setAttributePrefix("a_");   // Tell the twgl to match position with a_position, normal with a_normal etc..
-  programInfo = twgl.createProgramInfo(gl, [vs, fs]);  // setup GLSL program
+   // setup GLSL program
+   program = twgl.createProgramFromSources(gl, [vs, fs]);
+   uniformSetters = twgl.createUniformSetters(gl, program);
+   attribSetters  = twgl.createAttributeSetters(gl, program);
+}
+
+function setSphere() {
+  sphereBuffer = twgl.primitives.createSphereBuffers(gl, 10, 50, 20);
+
+  attribs = {
+    a_position: { buffer: sphereBuffer.position, numComponents: 3, },
+    a_normal:   { buffer: sphereBuffer.normal,   numComponents: 3, },
+    a_texcoord: { buffer: sphereBuffer.texcoord, numComponents: 2, },
+  };
+
+  sphereVAO = twgl.createVAOAndSetAttributes(gl, attribSetters, attribs, sphereBuffer.indices);
+
+  textures = [
+    textureUtils.makeStripeTexture(gl, { color1: "#FFF", color2: "#CCC", }),
+    textureUtils.makeCheckerTexture(gl, { color1: "#FFF", color2: "#CCC", }),
+    textureUtils.makeCircleTexture(gl, { color1: "#FFF", color2: "#CCC", }),
+  ];
+
+  console.log(sphereBuffer);
+}
+
+function setTextures(){
+  sunTexture = loadTexture("../textures/sunTexture.jpg");
+  mercuryTexture = loadTexture("../textures/mercuryTexture.jpg");
+  venusTexture = loadTexture("../textures/venusTexture.jpg");
+  earthTexture = loadTexture("../textures/earthTexture.jpg");
+  moonTexture = loadTexture("../textures/moonTexture.jpg");
+  marsTexture = loadTexture("../textures/marsTexture.jpg");
+  jupterTexture = loadTexture("../textures/jupterTexture.jpg");
+  saturnTexture = loadTexture("../textures/saturnTexture.jpg");
+  uranusTexture = loadTexture("../textures/uranusTexture.jpg");
+  neptuneTexture = loadTexture("../textures/neptuneTexture.jpg");
+  starTexture = loadTexture("../textures/starTexture.jpg");
 }
 
 function setStaticCameras() {
@@ -261,20 +319,13 @@ function setEarthCamera() {
   var cameraPosition = [earthOrbitNode.localMatrix[12]-50, earthOrbitNode.localMatrix[13], earthOrbitNode.localMatrix[14]];
   var cameraTarget = [earthOrbitNode.localMatrix[12], earthOrbitNode.localMatrix[13], earthOrbitNode.localMatrix[14]];
 
-  cameras[2].setAttributes( // Camera 0
+  cameras[2].setAttributes( 
     cameraPosition, // position
     cameraTarget,   // target
     [0,1,0],   // up
     gl.canvas.clientWidth / gl.canvas.clientHeight, // aspect
     60  // fieldOfView
   );
-}
-
-function setSphere() {
-  sphereBufferInfo = flattenedPrimitives.createSphereBufferInfo(gl, 10, 50, 20);
-  sphereVAO = twgl.createVAOFromBufferInfo(gl, programInfo, sphereBufferInfo);
-
-  console.log(sphereBufferInfo);
 }
 
 function setSolarSystemNodes() {
@@ -317,101 +368,81 @@ function configSolarSystem() {
   sunNode.localMatrix = m4.scaling(7, 7, 7);  // sun
   sunNode.drawInfo = {
     uniforms: {
-      u_color: [6, 5, 0, 1], // yellow
-    },
-    programInfo: programInfo,
-    bufferInfo: sphereBufferInfo,
-    vertexArray: sphereVAO,
+      u_colorMult:             [50, 50, 50, 1],
+      u_diffuse:               sunTexture,
+    }
   };
 
   mercuryNode.localMatrix = m4.scaling(0.8, 0.8, 0.8); // mercury
   mercuryNode.drawInfo = {
     uniforms: {
-      u_color: [0.8, 0.4, 0.4, 1],  // red
-    },
-    programInfo: programInfo,
-    bufferInfo: sphereBufferInfo,
-    vertexArray: sphereVAO,
+      u_colorMult:             [6, 6, 6, 1],
+      u_diffuse:               mercuryTexture,
+    }
   };
 
   venusNode.localMatrix = m4.scaling(1.25, 1.25, 1.25); // venus
   venusNode.drawInfo = {
     uniforms: {
-      u_color: [0.8, 0.5, 0.2, 1],  // blue-green
-    },
-    programInfo: programInfo,
-    bufferInfo: sphereBufferInfo,
-    vertexArray: sphereVAO,
+      u_colorMult:             [4, 4, 4, 1],
+      u_diffuse:               venusTexture,
+    }
   };
 
   earthNode.localMatrix = m4.scaling(1.3, 1.3, 1.3); // earth
   earthNode.drawInfo = {
     uniforms: {
-      u_color: [0.2, 0.5, 0.8, 1],  // blue-green
-    },
-    programInfo: programInfo,
-    bufferInfo: sphereBufferInfo,
-    vertexArray: sphereVAO,
+      u_colorMult:             [5, 5, 5, 1],
+      u_diffuse:               earthTexture,
+    }
   };
 
   moonNode.localMatrix = m4.scaling(0.3, 0.3, 0.3); // moon
   moonNode.drawInfo = {
     uniforms: {
-      u_color: [0.6, 0.6, 0.6, 1],  // gray
-    },
-    programInfo: programInfo,
-    bufferInfo: sphereBufferInfo,
-    vertexArray: sphereVAO,
+      u_colorMult:             [4, 4, 4, 1],
+      u_diffuse:               moonTexture,
+    }
   };
 
   marsNode.localMatrix = m4.scaling(1, 1, 1); // mars
   marsNode.drawInfo = {
     uniforms: {
-      u_color: [0.8, 0.3, 0.3, 1],  // red
-    },
-    programInfo: programInfo,
-    bufferInfo: sphereBufferInfo,
-    vertexArray: sphereVAO,
+      u_colorMult:             [5, 5, 5, 1],
+      u_diffuse:               marsTexture,
+    }
   };
 
   jupterNode.localMatrix = m4.scaling(2.5, 2.5, 2.5); // jupter
   jupterNode.drawInfo = {
     uniforms: {
-      u_color: [0.8, 0.3, 0.8, 1],  // purple
-    },
-    programInfo: programInfo,
-    bufferInfo: sphereBufferInfo,
-    vertexArray: sphereVAO,
+      u_colorMult:             [3, 3, 3, 1],
+      u_diffuse:               jupterTexture,
+    }
   };
 
   saturnNode.localMatrix = m4.scaling(2.1, 2.1, 2.1); // saturn
   saturnNode.drawInfo = {
     uniforms: {
-      u_color: [0.8, 0.8, 0.5, 1],  // brown
-    },
-    programInfo: programInfo,
-    bufferInfo: sphereBufferInfo,
-    vertexArray: sphereVAO,
+      u_colorMult:             [3, 3, 3, 1],
+      u_diffuse:               saturnTexture,
+    }
   };
 
   uranusNode.localMatrix = m4.scaling(1.5, 1.5, 1.5); // uranus
   uranusNode.drawInfo = {
     uniforms: {
-      u_color: [0.1, 0.8, 0.5, 1],  // blue-green
-    },
-    programInfo: programInfo,
-    bufferInfo: sphereBufferInfo,
-    vertexArray: sphereVAO,
+      u_colorMult:             [3, 3, 3, 1],
+      u_diffuse:               uranusTexture,
+    }
   };
 
   neptuneNode.localMatrix = m4.scaling(1.2, 1.2, 1.2); // neptune
   neptuneNode.drawInfo = {
     uniforms: {
-      u_color: [0.1, 0.1, 0.8, 1],  // blue
-    },
-    programInfo: programInfo,
-    bufferInfo: sphereBufferInfo,
-    vertexArray: sphereVAO,
+      u_colorMult:             [3, 3, 3, 1],
+      u_diffuse:               neptuneTexture,
+    }
   };
 
   // connect the celetial objects
@@ -464,31 +495,33 @@ function configSolarSystem() {
   ];
 }
 
-function setTranslationMoviment() {
+function setTranslationMoviment(time) {
+  var deltaTime = time - then;
   // translation moviment.
-  m4.multiply(m4.yRotation(0.03), mercuryOrbitNode.localMatrix, mercuryOrbitNode.localMatrix);
-  m4.multiply(m4.yRotation(0.0115), venusOrbitNode.localMatrix, venusOrbitNode.localMatrix);
-  m4.multiply(m4.yRotation(0.01), earthOrbitNode.localMatrix, earthOrbitNode.localMatrix);
-  m4.multiply(m4.yRotation(0.01), moonOrbitNode.localMatrix, moonOrbitNode.localMatrix);
-  m4.multiply(m4.yRotation(0.005), marsOrbitNode.localMatrix, marsOrbitNode.localMatrix);
-  m4.multiply(m4.yRotation(0.0009), jupterOrbitNode.localMatrix, jupterOrbitNode.localMatrix);
-  m4.multiply(m4.yRotation(0.0005), saturnOrbitNode.localMatrix, saturnOrbitNode.localMatrix);
-  m4.multiply(m4.yRotation(0.0003), uranusOrbitNode.localMatrix, uranusOrbitNode.localMatrix);
-  m4.multiply(m4.yRotation(0.0002), neptuneOrbitNode.localMatrix, neptuneOrbitNode.localMatrix);
+  m4.multiply(m4.yRotation(2 * deltaTime), mercuryOrbitNode.localMatrix, mercuryOrbitNode.localMatrix);
+  m4.multiply(m4.yRotation(1.3 * deltaTime), venusOrbitNode.localMatrix, venusOrbitNode.localMatrix);
+  m4.multiply(m4.yRotation(1.1 * deltaTime), earthOrbitNode.localMatrix, earthOrbitNode.localMatrix);
+  m4.multiply(m4.yRotation(2 * deltaTime), moonOrbitNode.localMatrix, moonOrbitNode.localMatrix);
+  m4.multiply(m4.yRotation(0.2 * deltaTime), marsOrbitNode.localMatrix, marsOrbitNode.localMatrix);
+  m4.multiply(m4.yRotation(0.1 * deltaTime), jupterOrbitNode.localMatrix, jupterOrbitNode.localMatrix);
+  m4.multiply(m4.yRotation(0.09 * deltaTime), saturnOrbitNode.localMatrix, saturnOrbitNode.localMatrix);
+  m4.multiply(m4.yRotation(0.05 * deltaTime), uranusOrbitNode.localMatrix, uranusOrbitNode.localMatrix);
+  m4.multiply(m4.yRotation(0.02 * deltaTime), neptuneOrbitNode.localMatrix, neptuneOrbitNode.localMatrix);
 }
 
-function setRotationMoviment() {
+function setRotationMoviment(time) {
+  var deltaTime = time - then;
   // rotation moviment
-  m4.multiply(m4.yRotation(0.001), sunNode.localMatrix, sunNode.localMatrix);
-  m4.multiply(m4.yRotation(0.005), mercuryNode.localMatrix, mercuryNode.localMatrix);
-  m4.multiply(m4.yRotation(0.0015), venusNode.localMatrix, venusNode.localMatrix);
-  m4.multiply(m4.yRotation(0.04), earthNode.localMatrix, earthNode.localMatrix); 
-  m4.multiply(m4.yRotation(-0.01), moonNode.localMatrix, moonNode.localMatrix);
-  m4.multiply(m4.yRotation(0.04), marsNode.localMatrix, marsNode.localMatrix);
-  m4.multiply(m4.yRotation(0.06), jupterNode.localMatrix, jupterNode.localMatrix);
-  m4.multiply(m4.yRotation(0.07), saturnNode.localMatrix, saturnNode.localMatrix);
-  m4.multiply(m4.yRotation(0.08), uranusNode.localMatrix, uranusNode.localMatrix);
-  m4.multiply(m4.yRotation(0.09), neptuneNode.localMatrix, neptuneNode.localMatrix);
+  m4.multiply(m4.yRotation(0.001 * deltaTime), sunNode.localMatrix, sunNode.localMatrix);
+  m4.multiply(m4.yRotation(0.005 * deltaTime), mercuryNode.localMatrix, mercuryNode.localMatrix);
+  m4.multiply(m4.yRotation(0.0015 * deltaTime), venusNode.localMatrix, venusNode.localMatrix);
+  m4.multiply(m4.yRotation(1.2 * deltaTime), earthNode.localMatrix, earthNode.localMatrix); 
+  m4.multiply(m4.yRotation(-0.01 * deltaTime), moonNode.localMatrix, moonNode.localMatrix);
+  m4.multiply(m4.yRotation(0.04 * deltaTime), marsNode.localMatrix, marsNode.localMatrix);
+  m4.multiply(m4.yRotation(0.06 * deltaTime), jupterNode.localMatrix, jupterNode.localMatrix);
+  m4.multiply(m4.yRotation(0.07 * deltaTime), saturnNode.localMatrix, saturnNode.localMatrix);
+  m4.multiply(m4.yRotation(0.08 * deltaTime), uranusNode.localMatrix, uranusNode.localMatrix);
+  m4.multiply(m4.yRotation(0.09 * deltaTime), neptuneNode.localMatrix, neptuneNode.localMatrix);
 }
 
 function setLights() {
@@ -499,6 +532,8 @@ function setLights() {
   var sunLightDown = new Light();
   var sunLightFront = new Light();
   var sunLightBack = new Light();
+
+  var lightColor = [1,1,1];
 
   pointLight = {
     lightWorldPosition: [0,0,0],
@@ -537,7 +572,7 @@ function setLights() {
   }
 
 
-  const uniforms = {
+  const lightUniforms = {
     u_lightWorldPosition: pointLight.lightWorldPosition.concat(
       sunLightRigth.lightWorldPosition, 
       sunLightLeft.lightWorldPosition,
@@ -562,10 +597,11 @@ function setLights() {
       sunLightDown.limit,
       sunLightFront.limit,
       sunLightBack.limit
-    ]
+    ],
+    u_lightColor: lightColor
   }
 
-  twgl.setUniforms(programInfo, uniforms);
+  twgl.setUniforms(uniformSetters, lightUniforms);
 }
 
 function drawScene(time) {
@@ -573,8 +609,10 @@ function drawScene(time) {
 
   configScene();
 
-  setTranslationMoviment();
-  setRotationMoviment();  
+  setTranslationMoviment(time);
+  setRotationMoviment(time);  
+
+  then = time;
 
   solarSystemNode.updateWorldMatrix(); // Update all world matrices in the scene graph
 
@@ -583,7 +621,7 @@ function drawScene(time) {
   cameras[cameraIndex].setMatrix();
 
   setLights();
-
+ 
   // Compute all the matrices for rendering
   objects.forEach(function(object) {
     object.drawInfo.uniforms.u_worldViewProjection = m4.multiply(cameras[cameraIndex].viewProjectionMatrix, object.worldMatrix);
@@ -591,12 +629,12 @@ function drawScene(time) {
     var worldInverseTransposeMatrix = m4.transpose(worldInverseMatrix);
     object.drawInfo.uniforms.u_world = object.worldMatrix;
     object.drawInfo.uniforms.u_worldInverseTranspose = worldInverseTransposeMatrix;
+
+    twgl.setUniforms(uniformSetters, object.drawInfo.uniforms);
+
+    // Draw the geometry.
+    gl.drawElements(gl.TRIANGLES, sphereBuffer.numElements, gl.UNSIGNED_SHORT, 0);
   });
-
-  // ------ Draw the objects --------
-
-  //twgl.drawObjectList(gl, lights);
-  twgl.drawObjectList(gl, objectsToDraw);
   requestAnimationFrame(drawScene);
 }
 
@@ -609,10 +647,44 @@ function configScene() {
   // Clear the canvas AND the depth buffer.
   gl.clearColor(0, 0, 0, 1);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  
+  
+
+  gl.useProgram(program);
+
+  // Setup all the needed attributes.
+  gl.bindVertexArray(sphereVAO);
 }
 
 function degToRad(d) {
   return d * Math.PI / 180;
+}
+
+function loadTexture(url) {
+  const texture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+
+  const level = 0;
+  const internalFormat = gl.RGBA;
+  const width = 1;
+  const height = 1;
+  const border = 0;
+  const srcFormat = gl.RGBA;
+  const srcType = gl.UNSIGNED_BYTE;
+  const pixel = new Uint8Array([0, 0, 255, 255]);  // opaque blue
+  gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, width, height, border, srcFormat, srcType, pixel);
+
+  const image = new Image();
+  image.onload = function() {
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, srcFormat, srcType, image);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  };
+  image.src = url;
+
+  return texture;
 }
 
 /*************************************************************************************************************************/
