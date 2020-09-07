@@ -240,6 +240,7 @@ function main() {
   initProgram();
 
   setSphere();
+
   setTextures();
 
   setStaticCameras();
@@ -640,6 +641,9 @@ function drawScene(time) {
 
   configScene();
 
+  gl.useProgram(program);
+  gl.bindVertexArray(sphereVAO);
+
   setTranslationMoviment(time);
   setRotationMoviment(time);  
 
@@ -653,7 +657,7 @@ function drawScene(time) {
 
   setLights();
  
-  // Compute all the matrices for rendering
+  // Draw objects
   objects.forEach(function(object) {
     object.drawInfo.uniforms.u_worldViewProjection = m4.multiply(cameras[cameraIndex].viewProjectionMatrix, object.worldMatrix);
     var worldInverseMatrix = m4.inverse(object.worldMatrix);
@@ -676,15 +680,8 @@ function configScene() {
   gl.enable(gl.DEPTH_TEST);
 
   // Clear the canvas AND the depth buffer.
-  gl.clearColor(0, 0, 0, 1);
+  gl.clearColor(0, 0, 0, 0);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-  
-  
-
-  gl.useProgram(program);
-
-  // Setup all the needed attributes.
-  gl.bindVertexArray(sphereVAO);
 }
 
 function degToRad(d) {
