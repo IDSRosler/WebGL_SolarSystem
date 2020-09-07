@@ -125,18 +125,22 @@ var Camera = function() {
   this.fieldOfView = 0;
   this.up = [0, 0, 1];
   this.aspect = 2;
+  this.near = 1;
+  this.far = 2000;
 };
 
-Camera.prototype.setAttributes = function(cameraPosition, target, up, aspect, fieldOfView) {
+Camera.prototype.setAttributes = function(cameraPosition, target, up, aspect, fieldOfView, near, far) {
   this.fieldOfView = degToRad(fieldOfView);
   this.cameraPosition = cameraPosition;
   this.target = target;
   this.aspect = aspect;
   this.up = up;
+  this.near = near;
+  this.far = far;
 };
 
 Camera.prototype.setMatrix = function() {
-  this.projectionMatrix = m4.perspective(this.fieldOfView, this.aspect, 1, 2000);
+  this.projectionMatrix = m4.perspective(this.fieldOfView, this.aspect, this.near, this.far);
   this.cameraMatrix = m4.lookAt(this.cameraPosition, this.target, this.up);
   this.viewMatrix = m4.inverse(this.cameraMatrix);
   this.viewProjectionMatrix = m4.multiply(this.projectionMatrix, this.viewMatrix);
@@ -222,7 +226,6 @@ var jupterTexture;
 var saturnTexture;
 var uranusTexture;
 var neptuneTexture;
-var starTexture;
 
 /*************************************************************************************************************************
  Main
@@ -290,7 +293,6 @@ function setTextures(){
   saturnTexture = loadTexture("../textures/saturnTexture.jpg");
   uranusTexture = loadTexture("../textures/uranusTexture.jpg");
   neptuneTexture = loadTexture("../textures/neptuneTexture.jpg");
-  starTexture = loadTexture("../textures/starTexture.jpg");
 }
 
 function setStaticCameras() {
@@ -298,20 +300,24 @@ function setStaticCameras() {
   cameras.push(new Camera);
   cameras.push(new Camera);
 
-  cameras[0].setAttributes( // Camera 0
+  cameras[0].setAttributes( // Camera 0 (up)
     [0,700,0], // position
     [0,0,0],   // target
     [0,0,1],   // up
     gl.canvas.clientWidth / gl.canvas.clientHeight, // aspect
-    60  // fieldOfView
+    60,  // fieldOfView
+    1,  // near
+    2000  // far
   );
 
-  cameras[1].setAttributes( // Camera 1
+  cameras[1].setAttributes( // Camera 1 (front)
     [0,400,1000], // position
     [0,0,0],   // target
     [0,1,0],   // up
     gl.canvas.clientWidth / gl.canvas.clientHeight, // aspect
-    60  // fieldOfView
+    60,  // fieldOfView
+    1,  // near
+    2000  // far
   );
 }
 
@@ -324,7 +330,9 @@ function setEarthCamera() {
     cameraTarget,   // target
     [0,1,0],   // up
     gl.canvas.clientWidth / gl.canvas.clientHeight, // aspect
-    60  // fieldOfView
+    60,  // fieldOfView
+    1,  // near
+    80  // far
   );
 }
 
