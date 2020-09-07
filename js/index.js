@@ -153,6 +153,15 @@ Camera.prototype.setMatrix = function() {
 var Light = function() {};
 
 /*************************************************************************************************************************
+ Gui variables
+ *************************************************************************************************************************/
+
+ var config = {
+   cameraSelected: "Front",
+   planetSelected: "Mercury"
+ }
+
+/*************************************************************************************************************************
  Global Variables
  *************************************************************************************************************************/
 
@@ -170,12 +179,6 @@ var objects = [];
 
 var cameras = [];
 var cameraIndex = 1;
-
-var textures;
-
-/* var lightWorldPositionLocation;
-var lightDirection;
-var limit; */
 
 /*************************************************************************************************************************
  Buffers
@@ -232,6 +235,7 @@ var neptuneTexture;
  *************************************************************************************************************************/
 
 function main() {
+  renderGUI();
 
   initProgram();
 
@@ -263,7 +267,7 @@ function initProgram() {
 }
 
 function setSphere() {
-  sphereBuffer = twgl.primitives.createSphereBuffers(gl, 10, 50, 20);
+  sphereBuffer = twgl.primitives.createSphereBuffers(gl, 10, 50, 50);
 
   attribs = {
     a_position: { buffer: sphereBuffer.position, numComponents: 3, },
@@ -272,12 +276,6 @@ function setSphere() {
   };
 
   sphereVAO = twgl.createVAOAndSetAttributes(gl, attribSetters, attribs, sphereBuffer.indices);
-
-  textures = [
-    textureUtils.makeStripeTexture(gl, { color1: "#FFF", color2: "#CCC", }),
-    textureUtils.makeCheckerTexture(gl, { color1: "#FFF", color2: "#CCC", }),
-    textureUtils.makeCircleTexture(gl, { color1: "#FFF", color2: "#CCC", }),
-  ];
 
   console.log(sphereBuffer);
 }
@@ -321,18 +319,43 @@ function setStaticCameras() {
   );
 }
 
-function setEarthCamera() {
-  var cameraPosition = [earthOrbitNode.localMatrix[12]-50, earthOrbitNode.localMatrix[13], earthOrbitNode.localMatrix[14]];
-  var cameraTarget = [earthOrbitNode.localMatrix[12], earthOrbitNode.localMatrix[13], earthOrbitNode.localMatrix[14]];
+function setPlanetCamera(name) {
+  var cameraPosition;
+  var cameraTarget;
+  var cameraFieldOfView;
+  var cameraNear;
+  var cameraFar;
+
+  if (name == "Mercury") {
+    cameraPosition = [mercuryOrbitNode.localMatrix[12]-50, mercuryOrbitNode.localMatrix[13], mercuryOrbitNode.localMatrix[14]];
+    cameraTarget = [mercuryOrbitNode.localMatrix[12], mercuryOrbitNode.localMatrix[13], mercuryOrbitNode.localMatrix[14]];
+    cameraFieldOfView = 60;
+    cameraNear = 1;
+    cameraFar = 65;
+  }
+  else if (name == "Venus") {
+    cameraPosition = [venusOrbitNode.localMatrix[12]-50, venusOrbitNode.localMatrix[13], venusOrbitNode.localMatrix[14]];
+    cameraTarget = [venusOrbitNode.localMatrix[12], venusOrbitNode.localMatrix[13], venusOrbitNode.localMatrix[14]];
+    cameraFieldOfView = 60;
+    cameraNear = 1;
+    cameraFar = 80;
+  }
+  else if (name == "Earth") {
+    cameraPosition = [earthOrbitNode.localMatrix[12]-50, earthOrbitNode.localMatrix[13], earthOrbitNode.localMatrix[14]];
+    cameraTarget = [earthOrbitNode.localMatrix[12], earthOrbitNode.localMatrix[13], earthOrbitNode.localMatrix[14]];
+    cameraFieldOfView = 60;
+    cameraNear = 1;
+    cameraFar = 80;
+  }
 
   cameras[2].setAttributes( 
     cameraPosition, // position
     cameraTarget,   // target
     [0,1,0],   // up
     gl.canvas.clientWidth / gl.canvas.clientHeight, // aspect
-    60,  // fieldOfView
-    1,  // near
-    80  // far
+    cameraFieldOfView,  // fieldOfView
+    cameraNear,  // near
+    cameraFar  // far
   );
 }
 
@@ -363,15 +386,15 @@ function setSolarSystemNodes() {
 }
 
 function configSolarSystem() {
-  mercuryOrbitNode.localMatrix = m4.translation(150, 0, 0); // earth orbit 150 units from the sun
-  venusOrbitNode.localMatrix = m4.translation(250, 0, 0);   // earth orbit 250 units from the sun
-  earthOrbitNode.localMatrix = m4.translation(350, 0, 0);   // earth orbit 350 units from the sun
+  mercuryOrbitNode.localMatrix = m4.translation(200, 0, 0); // earth orbit 200 units from the sun
+  venusOrbitNode.localMatrix = m4.translation(300, 0, 0);   // earth orbit 300 units from the sun
+  earthOrbitNode.localMatrix = m4.translation(400, 0, 0);   // earth orbit 400 units from the sun
   moonOrbitNode.localMatrix = m4.translation(30, 0, 0);     // moon 30 units from the earth
-  marsOrbitNode.localMatrix = m4.translation(450, 0, 0);    // earth orbit 450 units from the sun
-  jupterOrbitNode.localMatrix = m4.translation(550, 0, 0);    // earth orbit 550 units from the sun
-  saturnOrbitNode.localMatrix = m4.translation(650, 0, 0);    // earth orbit 650 units from the sun
-  uranusOrbitNode.localMatrix = m4.translation(750, 0, 0);    // earth orbit 750 units from the sun
-  neptuneOrbitNode.localMatrix = m4.translation(850, 0, 0);    // earth orbit 850 units from the sun
+  marsOrbitNode.localMatrix = m4.translation(500, 0, 0);    // earth orbit 500 units from the sun
+  jupterOrbitNode.localMatrix = m4.translation(600, 0, 0);    // earth orbit 600 units from the sun
+  saturnOrbitNode.localMatrix = m4.translation(700, 0, 0);    // earth orbit 700 units from the sun
+  uranusOrbitNode.localMatrix = m4.translation(800, 0, 0);    // earth orbit 800 units from the sun
+  neptuneOrbitNode.localMatrix = m4.translation(900, 0, 0);    // earth orbit 900 units from the sun
 
   sunNode.localMatrix = m4.scaling(7, 7, 7);  // sun
   sunNode.drawInfo = {
@@ -624,7 +647,7 @@ function drawScene(time) {
 
   solarSystemNode.updateWorldMatrix(); // Update all world matrices in the scene graph
 
-  setEarthCamera();
+  setPlanetCamera(config.planetSelected);
 
   cameras[cameraIndex].setMatrix();
 
@@ -693,6 +716,33 @@ function loadTexture(url) {
   image.src = url;
 
   return texture;
+}
+
+function renderGUI() {
+  const gui = new dat.GUI();
+
+  // Folders
+  const cameraFolder = gui.addFolder("Cameras");
+
+  // Camera
+  cameraFolder.add(config, "cameraSelected", "Above").options(
+    "Front",
+    "Above", 
+    "Mercury",
+    "Venus",
+    "Earth"
+    ).onChange(() => {
+    if (config.cameraSelected == "Above") {
+      cameraIndex = 0;
+    }
+    else if(config.cameraSelected == "Front") {
+      cameraIndex = 1;
+    }
+    else {
+      cameraIndex = 2;
+      config.planetSelected = config.cameraSelected;
+    }
+  });
 }
 
 /*************************************************************************************************************************/
