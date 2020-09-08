@@ -110,6 +110,14 @@ Node.prototype.updateWorldMatrix = function(matrix) {
   });
 };
 
+Node.prototype.resetWorldMatrix = function() {
+  this.localMatrix = m4.identity();
+  this.worldMatrix = m4.identity();
+  this.children.forEach(function(child) {
+    child.resetWorldMatrix();
+  });
+};
+
 /*************************************************************************************************************************
  Class Camera
  *************************************************************************************************************************/
@@ -158,7 +166,15 @@ var Light = function() {};
 
  var config = {
    cameraSelected: "Front",
-   planetSelected: "Mercury"
+   planetSelected: "Mercury",
+   start: () => {animation = true;},
+   stop: () => {animation = false;},
+   reset: () => {
+     solarSystemNode.resetWorldMatrix();
+     configSolarSystem();
+     configComet();
+     animation = false;
+   }
  }
 
 /*************************************************************************************************************************
@@ -178,6 +194,8 @@ var objects = [];
 
 var cameras = [];
 var cameraIndex = 1;
+
+var animation = false;
 
 /*************************************************************************************************************************
  Buffers
@@ -237,12 +255,6 @@ var neptuneTexture;
 var cometTexture;
 
 /*************************************************************************************************************************
- Animation Variables
- *************************************************************************************************************************/
-
- var cometStep = 0;
-
-/*************************************************************************************************************************
  Main
  *************************************************************************************************************************/
 
@@ -296,7 +308,7 @@ function setSphere() {
 }
 
 function setComet() {
-  cometBuffer = twgl.primitives.createSphereBuffers(gl, 10, 20, 20);
+  cometBuffer = twgl.primitives.createSphereBuffers(gl, 10, 20, 8);
 
   attribs = {
     a_position: { buffer: cometBuffer.position, numComponents: 3, },
@@ -695,9 +707,11 @@ function drawScene(time) {
   gl.useProgram(program);
   gl.bindVertexArray(sphereVAO);
 
-  setTranslationMoviment(time);
-  setRotationMoviment(time);  
-  setRotationOfComet(time);
+  if (animation) {
+    setTranslationMoviment(time);
+    setRotationMoviment(time);  
+    setRotationOfComet(time);
+  }  
 
   then = time;
 
@@ -782,11 +796,21 @@ function loadTexture(url) {
   return texture;
 }
 
+function getPointInBezierCurve(t, meanPoint , startP, endP) { // Bezier curve
+  var p0 = startP;
+  var p1 = meanPoint;
+  var p2 = [endP[0], endP[1]];
+  p2[0] = (1-t) ** 2 * p0[0] + (1-t) * 2 * t * p1[0] + t * t * p2[0];
+  p2[1] = (1-t) ** 2 * p0[1] + (1-t) * 2 * t * p1[1] + t * t * p2[1];
+  return [p2[0], p2[1]];
+}
+
 function renderGUI() {
   const gui = new dat.GUI();
 
   // Folders
   const cameraFolder = gui.addFolder("Cameras");
+  const animationFolder = gui.addFolder("Animation");
 
   // Camera
   cameraFolder.add(config, "cameraSelected", "Above").options(
@@ -808,15 +832,11 @@ function renderGUI() {
       config.planetSelected = config.cameraSelected;
     }
   });
-}
 
-function getPointInBezierCurve(t, meanPoint , startP, endP) { // Bezier curve
-  var p0 = startP;
-  var p1 = meanPoint;
-  var p2 = [endP[0], endP[1]];
-  p2[0] = (1-t) ** 2 * p0[0] + (1-t) * 2 * t * p1[0] + t * t * p2[0];
-  p2[1] = (1-t) ** 2 * p0[1] + (1-t) * 2 * t * p1[1] + t * t * p2[1];
-  return [p2[0], p2[1]];
+  // Animation
+  animationFolder.add(config, "start");
+  animationFolder.add(config, "stop");
+  animationFolder.add(config, "reset");
 }
 
 /*************************************************************************************************************************/
