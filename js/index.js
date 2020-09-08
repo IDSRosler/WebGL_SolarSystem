@@ -174,7 +174,6 @@ var canvas;
 var gl;
 var then = 0;
 
-var objectsToDraw = [];
 var objects = [];
 
 var cameras = [];
@@ -186,6 +185,9 @@ var cameraIndex = 1;
 
 var sphereBuffer;
 var sphereVAO;
+
+var cometBuffer;
+var cometVAO;
 
 /*************************************************************************************************************************
  Solar System Variables
@@ -214,6 +216,9 @@ var jupterNode;
 var saturnNode;
 var uranusNode;
 var neptuneNode;
+//Comet
+var cometOrbitNode;
+var cometNode;
 
 /*************************************************************************************************************************
  Textures
@@ -229,6 +234,7 @@ var jupterTexture;
 var saturnTexture;
 var uranusTexture;
 var neptuneTexture;
+var cometTexture;
 
 /*************************************************************************************************************************
  Main
@@ -240,13 +246,17 @@ function main() {
   initProgram();
 
   setSphere();
+  setComet();
 
   setTextures();
 
   setStaticCameras();
 
   setSolarSystemNodes();  
-  configSolarSystem();  
+  configSolarSystem(); 
+  
+  setCometNode();
+  configComet();
 
   requestAnimationFrame(drawScene);
 }
@@ -277,8 +287,18 @@ function setSphere() {
   };
 
   sphereVAO = twgl.createVAOAndSetAttributes(gl, attribSetters, attribs, sphereBuffer.indices);
+}
 
-  console.log(sphereBuffer);
+function setComet() {
+  cometBuffer = twgl.primitives.createSphereBuffers(gl, 10, 8, 8);
+
+  attribs = {
+    a_position: { buffer: cometBuffer.position, numComponents: 3, },
+    a_normal:   { buffer: cometBuffer.normal,   numComponents: 3, },
+    a_texcoord: { buffer: cometBuffer.texcoord, numComponents: 2, },
+  };
+
+  cometVAO = twgl.createVAOAndSetAttributes(gl, attribSetters, attribs, cometBuffer.indices);
 }
 
 function setTextures(){
@@ -292,6 +312,7 @@ function setTextures(){
   saturnTexture = loadTexture("../textures/saturnTexture.jpg");
   uranusTexture = loadTexture("../textures/uranusTexture.jpg");
   neptuneTexture = loadTexture("../textures/neptuneTexture.jpg");
+  cometTexture = loadTexture("../textures/cometTexture.jpg");
 }
 
 function setStaticCameras() {
@@ -348,6 +369,13 @@ function setPlanetCamera(name) {
     cameraNear = 1;
     cameraFar = 80;
   }
+  else if (name == "Comet") {
+    cameraPosition = [cometOrbitNode.localMatrix[12]-50, cometOrbitNode.localMatrix[13], cometOrbitNode.localMatrix[14]];
+    cameraTarget = [cometOrbitNode.localMatrix[12], cometOrbitNode.localMatrix[13], cometOrbitNode.localMatrix[14]];
+    cameraFieldOfView = 60;
+    cameraNear = 1;
+    cameraFar = 80;
+  }
 
   cameras[2].setAttributes( 
     cameraPosition, // position
@@ -384,6 +412,12 @@ function setSolarSystemNodes() {
   saturnNode = new Node();
   uranusNode = new Node();
   neptuneNode = new Node();
+}
+
+function setCometNode() {
+  // Comet
+  cometOrbitNode = new Node();
+  cometNode = new Node();
 }
 
 function configSolarSystem() {
@@ -512,19 +546,22 @@ function configSolarSystem() {
     uranusNode,
     neptuneNode,
   ];
+}
 
-  objectsToDraw = [
-    sunNode.drawInfo,
-    mercuryNode.drawInfo,
-    venusNode.drawInfo,
-    earthNode.drawInfo,
-    moonNode.drawInfo,
-    marsNode.drawInfo,
-    jupterNode.drawInfo,
-    saturnNode.drawInfo,
-    uranusNode.drawInfo,
-    neptuneNode.drawInfo,
-  ];
+function configComet() {
+  cometOrbitNode.localMatrix = m4.translation(1050, 400, 0);
+
+  cometNode.drawInfo = {
+    uniforms: {
+      u_colorMult:             [8, 8, 8, 8],
+      u_diffuse:               cometTexture,
+    }
+  };
+
+  cometOrbitNode.setParent(solarSystemNode);
+  cometNode.setParent(cometOrbitNode);
+
+  console.log(cometNode);
 }
 
 function setTranslationMoviment(time) {
@@ -657,7 +694,7 @@ function drawScene(time) {
 
   setLights();
  
-  // Draw objects
+  // Draw solar system
   objects.forEach(function(object) {
     object.drawInfo.uniforms.u_worldViewProjection = m4.multiply(cameras[cameraIndex].viewProjectionMatrix, object.worldMatrix);
     var worldInverseMatrix = m4.inverse(object.worldMatrix);
@@ -670,6 +707,21 @@ function drawScene(time) {
     // Draw the geometry.
     gl.drawElements(gl.TRIANGLES, sphereBuffer.numElements, gl.UNSIGNED_SHORT, 0);
   });
+
+  // Draw comet
+  gl.bindVertexArray(cometVAO);
+
+  cometNode.drawInfo.uniforms.u_worldViewProjection = m4.multiply(cameras[cameraIndex].viewProjectionMatrix, cometNode.worldMatrix);
+  var worldInverseMatrix = m4.inverse(cometNode.worldMatrix);
+  var worldInverseTransposeMatrix = m4.transpose(worldInverseMatrix);
+  cometNode.drawInfo.uniforms.u_world = cometNode.worldMatrix;
+  cometNode.drawInfo.uniforms.u_worldInverseTranspose = worldInverseTransposeMatrix;
+
+  twgl.setUniforms(uniformSetters, cometNode.drawInfo.uniforms);
+
+  // Draw the geometry.
+  gl.drawElements(gl.TRIANGLES, cometBuffer.numElements, gl.UNSIGNED_SHORT, 0);
+
   requestAnimationFrame(drawScene);
 }
 
@@ -727,7 +779,8 @@ function renderGUI() {
     "Above", 
     "Mercury",
     "Venus",
-    "Earth"
+    "Earth",
+    "Comet"
     ).onChange(() => {
     if (config.cameraSelected == "Above") {
       cameraIndex = 0;
@@ -740,6 +793,15 @@ function renderGUI() {
       config.planetSelected = config.cameraSelected;
     }
   });
+}
+
+function getPointInBezierCurve(t, meanPoint , startP, endP) { // Bezier curve
+  var p0 = startP;
+  var p1 = meanPoint;
+  var p2 = [endP[0], endP[1]];
+  p2[0] = (1-t) ** 2 * p0[0] + (1-t) * 2 * t * p1[0] + t * t * p2[0];
+  p2[1] = (1-t) ** 2 * p0[1] + (1-t) * 2 * t * p1[1] + t * t * p2[1];
+  return [p2[0], p2[1]];
 }
 
 /*************************************************************************************************************************/
