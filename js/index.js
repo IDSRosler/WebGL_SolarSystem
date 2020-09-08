@@ -237,6 +237,12 @@ var neptuneTexture;
 var cometTexture;
 
 /*************************************************************************************************************************
+ Animation Variables
+ *************************************************************************************************************************/
+
+ var cometStep = 0;
+
+/*************************************************************************************************************************
  Main
  *************************************************************************************************************************/
 
@@ -290,7 +296,7 @@ function setSphere() {
 }
 
 function setComet() {
-  cometBuffer = twgl.primitives.createSphereBuffers(gl, 10, 8, 8);
+  cometBuffer = twgl.primitives.createSphereBuffers(gl, 10, 20, 20);
 
   attribs = {
     a_position: { buffer: cometBuffer.position, numComponents: 3, },
@@ -593,6 +599,14 @@ function setRotationMoviment(time) {
   m4.multiply(m4.yRotation(0.09 * deltaTime), neptuneNode.localMatrix, neptuneNode.localMatrix);
 }
 
+function setRotationOfComet(time) {
+  var deltaTime = time - then;
+  // rotation moviment
+  m4.multiply(m4.xRotation(1 * deltaTime), cometNode.localMatrix, cometNode.localMatrix);
+  m4.multiply(m4.yRotation(0.9 * deltaTime), cometNode.localMatrix, cometNode.localMatrix);
+  m4.multiply(m4.zRotation(-0.7 * deltaTime), cometNode.localMatrix, cometNode.localMatrix);
+}
+
 function setLights() {
   var pointLight = new Light();
   var sunLightRigth = new Light();
@@ -683,6 +697,7 @@ function drawScene(time) {
 
   setTranslationMoviment(time);
   setRotationMoviment(time);  
+  setRotationOfComet(time);
 
   then = time;
 
