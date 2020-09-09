@@ -174,6 +174,7 @@ var Light = function() {};
      configSolarSystem();
      configComet();
      animation = false;
+     tcurve = 0;
    }
  }
 
@@ -195,7 +196,15 @@ var objects = [];
 var cameras = [];
 var cameraIndex = 1;
 
+/*************************************************************************************************************************
+ Animation Variables
+ *************************************************************************************************************************/
+
 var animation = false;
+var tcurve = 0;
+var startPoint = {x: 1100,y: 500};
+var endPoint = {x: 1100,y: -500};
+var controlPoint = {x: -2000, y: 0};
 
 /*************************************************************************************************************************
  Buffers
@@ -343,7 +352,7 @@ function setStaticCameras() {
     [0,0,0],   // target
     [0,0,1],   // up
     gl.canvas.clientWidth / gl.canvas.clientHeight, // aspect
-    60,  // fieldOfView
+    80,  // fieldOfView
     1,  // near
     2000  // far
   );
@@ -390,9 +399,9 @@ function setPlanetCamera(name) {
   else if (name == "Comet") {
     cameraPosition = [cometOrbitNode.localMatrix[12]-50, cometOrbitNode.localMatrix[13], cometOrbitNode.localMatrix[14]];
     cameraTarget = [cometOrbitNode.localMatrix[12], cometOrbitNode.localMatrix[13], cometOrbitNode.localMatrix[14]];
-    cameraFieldOfView = 60;
+    cameraFieldOfView = 80;
     cameraNear = 1;
-    cameraFar = 80;
+    cameraFar = 2000;
   }
 
   cameras[2].setAttributes( 
@@ -567,7 +576,7 @@ function configSolarSystem() {
 }
 
 function configComet() {
-  cometOrbitNode.localMatrix = m4.translation(1050, 400, 0);
+  cometOrbitNode.localMatrix = m4.translation(2000, 0, 500);
 
   cometNode.drawInfo = {
     uniforms: {
@@ -617,6 +626,15 @@ function setRotationOfComet(time) {
   m4.multiply(m4.xRotation(1 * deltaTime), cometNode.localMatrix, cometNode.localMatrix);
   m4.multiply(m4.yRotation(0.9 * deltaTime), cometNode.localMatrix, cometNode.localMatrix);
   m4.multiply(m4.zRotation(-0.7 * deltaTime), cometNode.localMatrix, cometNode.localMatrix);
+}
+
+function setCometMoviment(time) {
+  var deltaTime = time - then;
+
+  tcurve += 0.05 * deltaTime;
+
+  var point = getPointInBezierCurve(tcurve, [controlPoint.x, controlPoint.y], [startPoint.x, startPoint.y], [endPoint.x, endPoint.y]);
+  cometOrbitNode.localMatrix = m4.translation(point[0], 0, point[1]);
 }
 
 function setLights() {
@@ -711,6 +729,7 @@ function drawScene(time) {
     setTranslationMoviment(time);
     setRotationMoviment(time);  
     setRotationOfComet(time);
+    setCometMoviment(time);
   }  
 
   then = time;
