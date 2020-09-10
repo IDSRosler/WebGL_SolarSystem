@@ -202,8 +202,8 @@ var cameraIndex = 1;
 
 var animation = false;
 var tcurve = 0;
-var startPoint = {x: 1100,y: 500};
-var endPoint = {x: 1100,y: -500};
+var startPoint = {x: 1100,y: 350};
+var endPoint = {x: 1100,y: -350};
 var controlPoint = {x: -2000, y: 0};
 
 /*************************************************************************************************************************
@@ -396,7 +396,49 @@ function setPlanetCamera(name) {
     cameraNear = 1;
     cameraFar = 80;
   }
-  else if (name == "Comet") {
+  else if (name == "Mars") {
+    cameraPosition = [marsOrbitNode.localMatrix[12]-50, marsOrbitNode.localMatrix[13], marsOrbitNode.localMatrix[14]];
+    cameraTarget = [marsOrbitNode.localMatrix[12], marsOrbitNode.localMatrix[13], marsOrbitNode.localMatrix[14]];
+    cameraFieldOfView = 50;
+    cameraNear = 1;
+    cameraFar = 80;
+  }
+  else if (name == "Jupter") {
+    cameraPosition = [jupterOrbitNode.localMatrix[12]-50, jupterOrbitNode.localMatrix[13], jupterOrbitNode.localMatrix[14]];
+    cameraTarget = [jupterOrbitNode.localMatrix[12], jupterOrbitNode.localMatrix[13], jupterOrbitNode.localMatrix[14]];
+    cameraFieldOfView = 80;
+    cameraNear = 1;
+    cameraFar = 80;
+  }
+  else if (name == "Saturn") {
+    cameraPosition = [saturnOrbitNode.localMatrix[12]-50, saturnOrbitNode.localMatrix[13], saturnOrbitNode.localMatrix[14]];
+    cameraTarget = [saturnOrbitNode.localMatrix[12], saturnOrbitNode.localMatrix[13], saturnOrbitNode.localMatrix[14]];
+    cameraFieldOfView = 80;
+    cameraNear = 1;
+    cameraFar = 80;
+  }
+  else if (name == "Uranus") {
+    cameraPosition = [uranusOrbitNode.localMatrix[12]-50, uranusOrbitNode.localMatrix[13], uranusOrbitNode.localMatrix[14]];
+    cameraTarget = [uranusOrbitNode.localMatrix[12], uranusOrbitNode.localMatrix[13], uranusOrbitNode.localMatrix[14]];
+    cameraFieldOfView = 60;
+    cameraNear = 1;
+    cameraFar = 80;
+  }
+  else if (name == "Neptune") {
+    cameraPosition = [neptuneOrbitNode.localMatrix[12]-50, neptuneOrbitNode.localMatrix[13], neptuneOrbitNode.localMatrix[14]];
+    cameraTarget = [neptuneOrbitNode.localMatrix[12], neptuneOrbitNode.localMatrix[13], neptuneOrbitNode.localMatrix[14]];
+    cameraFieldOfView = 60;
+    cameraNear = 1;
+    cameraFar = 80;
+  }
+  else if (name == "CometView1") {
+    cameraPosition = [cometOrbitNode.localMatrix[12]-50, cometOrbitNode.localMatrix[13], cometOrbitNode.localMatrix[14]+50];
+    cameraTarget = [cometOrbitNode.localMatrix[12], cometOrbitNode.localMatrix[13], cometOrbitNode.localMatrix[14]];
+    cameraFieldOfView = 80;
+    cameraNear = 1;
+    cameraFar = 2000;
+  }
+  else if (name == "CometView2") {
     cameraPosition = [cometOrbitNode.localMatrix[12]-50, cometOrbitNode.localMatrix[13], cometOrbitNode.localMatrix[14]];
     cameraTarget = [cometOrbitNode.localMatrix[12], cometOrbitNode.localMatrix[13], cometOrbitNode.localMatrix[14]];
     cameraFieldOfView = 80;
@@ -576,8 +618,9 @@ function configSolarSystem() {
 }
 
 function configComet() {
-  cometOrbitNode.localMatrix = m4.translation(2000, 0, 500);
+  cometOrbitNode.localMatrix = m4.translation(2000, 0, 350);
 
+  cometNode.localMatrix = m4.scaling(0.5,0.5,0.5);
   cometNode.drawInfo = {
     uniforms: {
       u_colorMult:             [8, 8, 8, 8],
@@ -594,15 +637,15 @@ function configComet() {
 function setTranslationMoviment(time) {
   var deltaTime = time - then;
   // translation moviment.
-  m4.multiply(m4.yRotation(2 * deltaTime), mercuryOrbitNode.localMatrix, mercuryOrbitNode.localMatrix);
-  m4.multiply(m4.yRotation(1.3 * deltaTime), venusOrbitNode.localMatrix, venusOrbitNode.localMatrix);
-  m4.multiply(m4.yRotation(1.1 * deltaTime), earthOrbitNode.localMatrix, earthOrbitNode.localMatrix);
+  m4.multiply(m4.yRotation(1.5 * deltaTime), mercuryOrbitNode.localMatrix, mercuryOrbitNode.localMatrix);
+  m4.multiply(m4.yRotation(1.1 * deltaTime), venusOrbitNode.localMatrix, venusOrbitNode.localMatrix);
+  m4.multiply(m4.yRotation(0.9 * deltaTime), earthOrbitNode.localMatrix, earthOrbitNode.localMatrix);
   m4.multiply(m4.yRotation(2 * deltaTime), moonOrbitNode.localMatrix, moonOrbitNode.localMatrix);
   m4.multiply(m4.yRotation(0.2 * deltaTime), marsOrbitNode.localMatrix, marsOrbitNode.localMatrix);
   m4.multiply(m4.yRotation(0.1 * deltaTime), jupterOrbitNode.localMatrix, jupterOrbitNode.localMatrix);
   m4.multiply(m4.yRotation(0.09 * deltaTime), saturnOrbitNode.localMatrix, saturnOrbitNode.localMatrix);
   m4.multiply(m4.yRotation(0.05 * deltaTime), uranusOrbitNode.localMatrix, uranusOrbitNode.localMatrix);
-  m4.multiply(m4.yRotation(0.02 * deltaTime), neptuneOrbitNode.localMatrix, neptuneOrbitNode.localMatrix);
+  m4.multiply(m4.yRotation(0.03 * deltaTime), neptuneOrbitNode.localMatrix, neptuneOrbitNode.localMatrix);
 }
 
 function setRotationMoviment(time) {
@@ -799,7 +842,7 @@ function loadTexture(url) {
   const border = 0;
   const srcFormat = gl.RGBA;
   const srcType = gl.UNSIGNED_BYTE;
-  const pixel = new Uint8Array([0, 0, 255, 255]);  // opaque blue
+  const pixel = new Uint8Array([0, 0, 255, 255]);
   gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, width, height, border, srcFormat, srcType, pixel);
 
   const image = new Image();
@@ -835,10 +878,16 @@ function renderGUI() {
   cameraFolder.add(config, "cameraSelected", "Above").options(
     "Front",
     "Above", 
+    "CometView1",
+    "CometView2",
     "Mercury",
     "Venus",
     "Earth",
-    "Comet"
+    "Mars",
+    "Jupter",
+    "Saturn",
+    "Uranus",
+    "Neptune"
     ).onChange(() => {
     if (config.cameraSelected == "Above") {
       cameraIndex = 0;
